@@ -47,10 +47,14 @@ out_format = '''{"選擇題":[
 
 client = OpenAI()
 
-# Streamlit App Layout
-st.set_page_config(layout="wide")  # 設置寬屏模式
+# 初始化狀態
+if "user_answers" not in st.session_state:
+    st.session_state.user_answers = {}
+if "generated_data" not in st.session_state:
+    st.session_state.generated_data = None
 
 # Streamlit App Layout
+st.set_page_config(layout="wide")
 st.title("考題生成器")
 st.write("根據文章自動生成選擇題和是非題，並進行答題測試！")
 
@@ -60,9 +64,9 @@ with st.sidebar:
     article = st.text_area("請輸入文章：", value=document, height=200)
     num_choices = st.number_input("請輸入要生成幾題選擇題：", min_value=1, max_value=10, value=3, step=1)
     num_true_false = st.number_input("請輸入要生成幾題是非題：", min_value=1, max_value=10, value=3, step=1)
-    temperature = st.slider("請設定temperature (控制生成文本的隨機性)：", min_value=0.0, max_value=1.0, value=0.7, step=0.1)
+    temperature1 = st.slider("請設定temperature (控制生成文本的隨機性)：", min_value=0.0, max_value=1.0, value=0.7, step=0.1)
     generate_button = st.button("生成考題")
-    
+
 # Main Content Section
 if generate_button:
     if not article.strip():
@@ -77,7 +81,7 @@ if generate_button:
         with st.spinner("生成考題中，請稍候..."):
             try:
                 response = client.chat.completions.create(
-                    model="gpt-4o-mini",  # 選擇使用的模型
+                    model="gpt-4o-mini",
                     messages=[
                         {
                             "role": "system",
@@ -88,55 +92,73 @@ if generate_button:
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=temperature,
+                    temperature=temperature1,
                 )
 
                 data = json.loads(response.choices[0].message.content)
-
-                st.subheader("選擇題:")
-                user_answers = {}
-
-                for i, q in enumerate(data['選擇題']):
-                    st.write(f"**{i + 1}. {q['題目']}**")
-                    user_answers[f"choice_{i}"] = st.radio(
-                        label="", label_visibility="collapsed", options=[opt for opt in q['選項']], key=f"choice_{i}"
-                    )
-
-                st.subheader("是非題:")
-                for i, q in enumerate(data['是非題']):
-                    st.write(f"**{i + 1}. {q['題目']}**")
-                    user_answers[f"true_false_{i}"] = st.radio(
-                        label="", label_visibility="collapsed", options=["對", "錯"], key=f"true_false_{i}"
-                    )
-
-                # Submit Button
-                if st.button("提交所有答案"):
-                    total_score = 0
-                    correct_score = 0
-
-                    st.subheader("結果:")
-
-                    # Check answers and display results
-                    for i, q in enumerate(data['選擇題']):
-                        is_correct = user_answers[f"choice_{i}"] == q['答案']
-                        total_score += 1
-                        if is_correct:
-                            correct_score += 1
-                        st.write(f"**{i + 1}. {q['題目']}**")
-                        st.write(f"您的答案: {user_answers[f'choice_{i}']} {'✔️' if is_correct else '❌'}")
-                        st.write(f"正確答案: {q['答案']}")
-
-                    for i, q in enumerate(data['是非題']):
-                        is_correct = user_answers[f"true_false_{i}"] == q['答案']
-                        total_score += 1
-                        if is_correct:
-                            correct_score += 1
-                        st.write(f"**{i + 1}. {q['題目']}**")
-                        st.write(f"您的答案: {user_answers[f'true_false_{i}']} {'✔️' if is_correct else '❌'}")
-                        st.write(f"正確答案: {q['答案']}")
-
-                    # Display Total Score
-                    st.write(f"### 您的總得分：{correct_score}/{total_score}")
+                st.session_state.generated_data = data
+                st.session_state.user_answers = {}
 
             except Exception as e:
                 st.error(f"生成考題時出現錯誤：{e}")
+
+if st.session_state.generated_data:
+    data = st.session_state.generated_data
+
+    st.subheader("選擇題:")
+    for i, q in enumerate(data['選擇題'], start=1):
+        key = f"choice_{i}"
+        if key not in st.session_state.user_answers:
+            st.session_state.user_answers[key] = None
+
+        st.write(f"**{i}. {q['題目']}**")
+        st.session_state.user_answers[key] = st.radio(
+            label="",
+            options=q['選項'],
+            index=q['選項'].index(st.session_state.user_answers[key]) if st.session_state.user_answers[key] else 0,
+            key=key
+        )
+
+    st.subheader("是非題:")
+    for i, q in enumerate(data['是非題'], start=1):
+        key = f"true_false_{i}"
+        if key not in st.session_state.user_answers:
+            st.session_state.user_answers[key] = None
+
+        st.write(f"**{i}. {q['題目']}**")
+        st.session_state.user_answers[key] = st.radio(
+            label="",
+            options=["對", "錯"],
+            index=["對", "錯"].index(st.session_state.user_answers[key]) if st.session_state.user_answers[key] else 0,
+            key=key
+        )
+
+    if st.button("提交所有答案"):
+        total_score = 0
+        correct_score = 0
+
+        st.subheader("結果:")
+
+        for i, q in enumerate(data['選擇題'], start=1):
+            key = f"choice_{i}"
+            user_answer = st.session_state.user_answers[key]
+            is_correct = user_answer == q['答案']
+            total_score += 1
+            if is_correct:
+                correct_score += 1
+            st.write(f"**{i}. {q['題目']}**")
+            st.write(f"您的答案: {user_answer} {'✔️' if is_correct else '❌'}")
+            st.write(f"正確答案: {q['答案']}")
+
+        for i, q in enumerate(data['是非題'], start=1):
+            key = f"true_false_{i}"
+            user_answer = st.session_state.user_answers[key]
+            is_correct = user_answer == q['答案']
+            total_score += 1
+            if is_correct:
+                correct_score += 1
+            st.write(f"**{i}. {q['題目']}**")
+            st.write(f"您的答案: {user_answer} {'✔️' if is_correct else '❌'}")
+            st.write(f"正確答案: {q['答案']}")
+
+        st.write(f"### 您的總得分：{correct_score}/{total_score}")
