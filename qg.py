@@ -114,6 +114,7 @@ if st.session_state.generated_data:
         st.write(f"**{i}. {q['題目']}**")
         st.session_state.user_answers[key] = st.radio(
             label="",
+            label_visibility="collapsed",
             options=q['選項'],
             index=q['選項'].index(st.session_state.user_answers[key]) if st.session_state.user_answers[key] else 0,
             key=key
@@ -128,6 +129,7 @@ if st.session_state.generated_data:
         st.write(f"**{i}. {q['題目']}**")
         st.session_state.user_answers[key] = st.radio(
             label="",
+            label_visibility="collapsed",
             options=["對", "錯"],
             index=["對", "錯"].index(st.session_state.user_answers[key]) if st.session_state.user_answers[key] else 0,
             key=key
