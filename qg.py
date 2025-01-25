@@ -45,7 +45,7 @@ out_format = '''{"選擇題":[
     },
 ]}'''
 
-client = OpenAI()
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # 初始化狀態
 if "user_answers" not in st.session_state:
